@@ -23,3 +23,5 @@ build/
 # Editor files
 .vscode/
 .idea/
+# Generated files
+generated/
