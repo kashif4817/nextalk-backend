@@ -3,7 +3,6 @@ dotenv.config();
 
 export function validateEnv() {
     const requiredEnv = [
-        "DATABASE_URL",
         "SUPABASE_URL",
         "SUPABASE_ANON_KEY",
         "CLIENT_URL",

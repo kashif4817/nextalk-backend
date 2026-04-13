@@ -18,14 +18,9 @@
   "scripts": {
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon index.js",
-    "db:generate": "npx prisma generate",
-    "db:migrate": "npx prisma migrate dev",
-    "db:push": "npx prisma db push"
+    "dev": "nodemon index.js"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.7.0",
-    "@prisma/client": "^7.7.0",
     "@supabase/supabase-js": "^2.99.2",
     "body-parser": "^2.2.2",
     "cookie-parser": "^1.4.7",
@@ -40,8 +35,6 @@
   "devDependencies": {
     "@types/node": "^25.5.2",
     "@types/pg": "^8.20.0",
-    "prisma": "^7.7.0",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+    "tsx": "^4.21.0"
   }
 }

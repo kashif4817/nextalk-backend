@@ -5,6 +5,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { validateEnv } from "./src/config/env.js";
+import router from "./src/routes/userRoutes.js";
 
 dotenv.config();
 validateEnv();
@@ -21,6 +22,7 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+app.use('/api',router)
 
 app.get("/", (req, res) => {
   res.send("Hello world!");
