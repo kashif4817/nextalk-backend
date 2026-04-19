@@ -16,7 +16,7 @@ export const login = asyncHandler(async (req, res) => {
 });
 
 export const signup = asyncHandler(async (req, res) => {
-    console.log("signup api hit")
+  console.log("signup api hit")
   const { email, password } = req.body;
 
   if (!email || !password) return sendResponse(res, 400, "Email and password required");
@@ -26,3 +26,31 @@ export const signup = asyncHandler(async (req, res) => {
   if (error) return sendResponse(res, 400, error.message, null);
   return sendResponse(res, 201, "Signup successful", { access_token: data.session?.access_token });
 });
+
+export const logout = asyncHandler(async (req, res) => {
+
+  const { data, error } = await supabase.auth.signOut();
+
+  if (error) return sendResponse(res, 400, error.message, null);
+  return sendResponse(res, 201, "Logout successful");
+});
+
+export const refreshToken = asyncHandler(async (req, res) => {
+
+  const { data, error } = await supabase.auth.refreshToken();
+
+  if (error) return sendResponse(res, 400, error.message,);
+  return sendResponse(res, 200, "New refreshToken assigned",{refreshToken: data.session?.refreshToken });
+});
+
+
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+
+  const { data, error } = await supabase.auth.refreshToken();
+
+  if (error) return sendResponse(res, 400, error.message,);
+  return sendResponse(res, 200, "New refreshToken assigned",{refreshToken: data.session?.refreshToken });
+});
+
+
