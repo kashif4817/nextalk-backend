@@ -8,11 +8,9 @@ import { validateEnv } from "./src/config/env.js";
 import router from "./src/routes/userRoutes.js";
 
 dotenv.config();
-validateEnv();
-
+validateEnv(); 
 const app = express();
 
-app.use(morgan("dev"));
 app.use(helmet());
 app.use(
   cors({
@@ -20,9 +18,12 @@ app.use(
     credentials: true,
   }),
 );
+app.use(morgan("dev"));
 app.use(express.json());
 app.use(cookieParser());
 app.use('/api',router)
+
+
 
 app.get("/", (req, res) => {
   res.send("Hello world!");
