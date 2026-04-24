@@ -1,7 +1,6 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import { sendResponse } from "../utils/sendResponse.js";
 import supabase from "../config/supabase.js";
-import e from "express";
 
 export const searchUsers = asyncHandler(async (req, res) => {
   const { search } = req.query;
