@@ -19,7 +19,7 @@ export const createConversation = asyncHandler(async (req, res) => {
     return sendResponse(res, 500, "Internal Server Error");
   }
 
-  const conversationIds = user1Conversations.map(c => c.conversation_id);
+  const conversationIds = user1Conversations.map((c) => c.conversation_id);
 
   // Step 2: Check if user2 exists in any of those conversations
   const { data: existingConversation, error: user2Error } = await supabase
@@ -34,7 +34,12 @@ export const createConversation = asyncHandler(async (req, res) => {
 
   // Step 3: If conversation already exists
   if (existingConversation.length > 0) {
-    return sendResponse(res, 200, "Conversation already exists", existingConversation);
+    return sendResponse(
+      res,
+      200,
+      "Conversation already exists",
+      existingConversation,
+    );
   }
 
   // Step 4: Create new conversation
@@ -70,34 +75,79 @@ export const createConversation = asyncHandler(async (req, res) => {
   return sendResponse(res, 201, "New conversation created", newConversation);
 });
 
-
 export const getSingleConversation = asyncHandler(async (req, res) => {
-  console.log("getSingleConversation  hit");
-
-  const {id} = req.params;
-
-  // Step 1: Get all conversations
-  const { data, error } = await supabase
+  const { id } = req.params;
+  const currentUserId = req.user.id;
+  console.log(id, currentUserId);
+  // ✅ Get conversation (single object)
+  const { data: conversation, error: convError } = await supabase
     .from("conversations")
-    .select("*")
-    .eq("id", id);
+    .select("id, created_at") // only what you need
+    .eq("id", id)
+    .single();
 
-  if (error) {
-    return sendResponse(res, 500, "Internal Server Error");
+  if (convError || !conversation) {
+    return sendResponse(res, 404, "Conversation not found");
   }
 
-  const { data: user1Conversations, error: user1Error } = await supabase
+  // ✅ Get OTHER participants only
+  const { data: participants, error: partError } = await supabase
     .from("conversation_members")
-    // .select("user_id")
+    .select("user_id, profiles(id, name, avatar)")
     .eq("conversation_id", id)
-    .select("user_id, profiles(*)")
+    .neq("user_id", currentUserId);
 
-      if (user1Error) {
-    return sendResponse(res, 500, "Internal Server Error");
+  if (partError) {
+    return sendResponse(res, 500, "Failed to fetch participants");
   }
 
-  sendResponse(200, "data found", {data,user1Conversations})
-
+  return sendResponse(res, 200, "Data found", {
+    conversation,
+    participants,
+  });
 });
 
+export const getAllConversations = asyncHandler(async (req, res) => {
+  const currentUserId = req.user.id;
+  console.log( currentUserId);
 
+  //step  1, getting all conversation on current user.
+  const { data: participants, error: partError } = await supabase
+    .from("conversation_members")
+.select("conversation_id")
+    .eq("user_id", currentUserId);
+
+
+
+  console.log("participants :>> ", participants);
+  if (partError) {
+    return sendResponse(res, 500, "Failed to fetch participants");
+  }
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("last_message")
+    .in(
+      "id",
+      participants.map(d=>d.conversation_id)
+    );
+
+  (console.log("data"), data);
+
+  const { data: message, error: messError } = await supabase
+    .from("messages")
+    .select("content")
+    .in(
+      "conversation_id",
+         participants.map(d=>d.conversation_id),
+    )
+    .eq("seen", false)
+    .neq("sender_id", currentUserId);
+
+  console.log("data",data)
+
+  console.log("participants :>> ", participants);
+  if (partError) {
+    return sendResponse(res, 500, "Failed to fetch participants");
+  }
+});
