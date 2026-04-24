@@ -1,9 +1,8 @@
 import express from 'express'
-// import { getUserProfile, searchUsers } from '../controllers/userController.js';
 import { authMiddleware } from '../middlewares/authMiddleware.js';
 import { forgotPassword, login, logout, refreshToken, signup } from '../controllers/authController.js';
+import { getMe, getUserProfile, searchUsers } from '../controllers/profileController.js';
 import { createConversation, getSingleConversation } from '../controllers/conversationController.js';
-import { getMe, getUserProfile } from '../controllers/profileController.js';
 
 const router = express.Router();
 //authController
@@ -15,7 +14,9 @@ router.post('/auth/forgot-password',forgotPassword)
 
 //profileController
 router.get('/users/me',authMiddleware,getMe);
+router.get('/users/search',authMiddleware,searchUsers)
 router.get('/users/:id',getUserProfile);
+
 
 
 //userController
