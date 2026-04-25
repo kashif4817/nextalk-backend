@@ -1,11 +1,30 @@
-export const messageEvents = (io, socket) => {
-  socket.on('message:send', async (data) => {
-    // 1. get sender_id from socket.data.userId
-  const userId = socket.data.userId;
-      // 2. insert message to DB
+import { createMessage } from "../../services/message.service";
 
-    // 3. update conversation last_message_id
-    
-    // 4. emit message:new to conv:{conversation_id}
-  })
-}
+export const messageEvents = (io, socket) => {
+  socket.on("message:send", async (data) => {
+    const sender_id = socket.data.userId;
+    const {
+      conversation_id,
+      content,
+      message_type,
+      file_url,
+      file_type,
+      reply_to_id,
+    } = data;
+
+    const message = await createMessage({
+      conversation_id,
+      sender_id,
+      content,
+      message_type,
+      file_url,
+      file_type,
+      reply_to_id,
+    });
+
+    if (!message) return; // silent fail on socket
+
+    // emit to conversation room
+    io.to(`conv:${conversation_id}`).emit("message:new", message);
+  });
+};
