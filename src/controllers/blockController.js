@@ -2,9 +2,8 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { sendResponse } from "../utils/sendResponse.js";
 import supabase from "../config/supabase.js";
 
-
 export const getBlockedUsers = asyncHandler(async (req, res) => {
-  const id = req.user.id;
+  const userId = req.user.id;
 
   const { data, error } = await supabase
     .from("blocked_users")
@@ -14,10 +13,11 @@ export const getBlockedUsers = asyncHandler(async (req, res) => {
         id, username, display_name, avatar_url
       )`
     )
-    .eq("blocker_id", id)
+    .eq("blocker_id", userId)
     .order("created_at", { ascending: false });
 
-  if (error) return sendResponse(res, 500, "Internal Server error", null);
+  if (error) return sendResponse(res, 500, "Failed to fetch blocked users", null);
+
   return sendResponse(res, 200, "Blocked users fetched", data);
 });
 
@@ -69,17 +69,18 @@ export const blockUser = asyncHandler(async (req, res) => {
 
 export const unblockUser = asyncHandler(async (req, res) => {
   const id = req.user.id;
-  const { id: blockRowId } = req.params;
+  const { id: blockRowId } = req.params; // this is the blocked_users row id
 
   const { data, error } = await supabase
     .from("blocked_users")
     .delete()
-    .eq("id", blockRowId)
-    .eq("blocker_id", id) // ensure ownership
-    .select("id")
-    .single();
+    .eq("id", blockRowId)       // match the row by its primary key
+    .eq("blocker_id", id)       // ensure the requester owns this block
+    .select("id");
 
   if (error) return sendResponse(res, 500, "Internal Server error", null);
-  if (!data) return sendResponse(res, 404, "Block not found", null);
+  if (!data || data.length === 0)
+    return sendResponse(res, 404, "Block not found", null);
+
   return sendResponse(res, 200, "User unblocked", null);
 });

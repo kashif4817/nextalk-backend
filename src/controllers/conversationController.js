@@ -2,60 +2,95 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { sendResponse } from "../utils/sendResponse.js";
 import supabase from "../config/supabase.js";
 
-
 export const getAllConversations = asyncHandler(async (req, res) => {
-  const id = req.user.id;
+  const userId = req.user.id;
 
-  // Get all conversations the user is a member of
   const { data, error } = await supabase
     .from("conversation_members")
-    .select(
-      `id, role, last_read_at, is_archived, is_pinned, muted_until,
+    .select(`
+      id,
+      role,
+      last_read_at,
+      is_archived,
+      is_pinned,
+      muted_until,
       conversation:conversation_id (
-        id, is_group, group_name, group_avatar, group_description,
-        last_message_at, created_at,
+        id,
+        is_group,
+        group_name,
+        group_avatar,
+        group_description,
+        last_message_at,
+        created_at,
+        deleted_at,
         last_message:last_message_id (
-          id, content, message_type, sender_id, created_at
+          id,
+          content,
+          message_type,
+          sender_id,
+          created_at
         ),
         members:conversation_members (
           user_id,
+          left_at,
+          removed_at,
           profile:user_id (
-            id, username, display_name, avatar_url, is_online, last_seen
+            id,
+            username,
+            display_name,
+            avatar_url,
+            is_online,
+            last_seen
           )
         )
-      )`
-    )
-    .eq("user_id", id)
-    .is("deleted_at", null)
+      )
+    `)
+    .eq("user_id", userId)
     .is("left_at", null)
     .is("removed_at", null)
-    .order("created_at", { ascending: false, foreignTable: "conversation" });
+    .order("last_read_at", { ascending: false });
 
-  if (error) return sendResponse(res, 500, "Internal Server error", null);
+  if (error) {
+    console.log(error);
+    return sendResponse(res, 500, "Internal Server error", null);
+  }
 
-  // Compute unread count per conversation
+  const active = (data || []).filter((r) => !r.conversation?.deleted_at);
+
   const enriched = await Promise.all(
-    data.map(async (row) => {
-      const lastReadAt = row.last_read_at;
+    active.map(async (row) => {
       const conversationId = row.conversation?.id;
+      const lastReadAt = row.last_read_at;
 
-      let unread_count = 0;
+      if (!conversationId) return { ...row, unread_count: 0 };
 
-      if (conversationId) {
-        const query = supabase
-          .from("messages")
-          .select("id", { count: "exact", head: true })
-          .eq("conversation_id", conversationId)
-          .neq("sender_id", id)
-          .is("deleted_for_everyone_at", null);
+      let query = supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("conversation_id", conversationId)
+        .neq("sender_id", userId)
+        .is("deleted_for_everyone_at", null);
 
-        if (lastReadAt) query.gt("created_at", lastReadAt);
-
-        const { count } = await query;
-        unread_count = count || 0;
+      if (lastReadAt) {
+        query = query.gt("created_at", lastReadAt);
       }
 
-      return { ...row, unread_count };
+      const { count, error: countError } = await query;
+
+      if (countError) {
+        console.log(countError);
+      }
+
+      return {
+        ...row,
+        unread_count: count || 0,
+        conversation: {
+          ...row.conversation,
+          members: (row.conversation?.members || []).filter(
+            (m) => !m.left_at && !m.removed_at
+          ),
+        },
+      };
     })
   );
 
@@ -63,257 +98,339 @@ export const getAllConversations = asyncHandler(async (req, res) => {
 });
 
 
-
 export const getConversation = asyncHandler(async (req, res) => {
-  const id = req.user.id;
+  const userId = req.user.id;
   const { id: conversationId } = req.params;
 
-  // Verify membership
   const { data: membership, error: memberError } = await supabase
     .from("conversation_members")
     .select("id")
     .eq("conversation_id", conversationId)
-    .eq("user_id", id)
+    .eq("user_id", userId)
     .is("left_at", null)
     .is("removed_at", null)
-    .single();
+    .maybeSingle();
 
-  if (memberError || !membership)
-    return sendResponse(res, 403, "You are not a member of this conversation");
+  if (memberError) {
+    console.log(memberError);
+    return sendResponse(res, 500, "Internal Server error", null);
+  }
+
+  if (!membership) {
+    return sendResponse(res, 403, "Not a member of this conversation");
+  }
 
   const { data, error } = await supabase
     .from("conversations")
-    .select(
-      `id, is_group, group_name, group_avatar, group_description,
-      created_by, last_message_at, created_at,
+    .select(`
+      id,
+      is_group,
+      group_name,
+      group_avatar,
+      group_description,
+      created_by,
+      last_message_at,
+      created_at,
       last_message:last_message_id (
-        id, content, message_type, sender_id, created_at
+        id,
+        content,
+        message_type,
+        sender_id,
+        created_at
       ),
       members:conversation_members (
-        id, role, last_read_at, is_archived, is_pinned, joined_at:created_at,
+        id,
+        role,
+        last_read_at,
+        is_archived,
+        is_pinned,
+        created_at,
         profile:user_id (
-          id, username, display_name, avatar_url, is_online, last_seen
+          id,
+          username,
+          display_name,
+          avatar_url,
+          is_online,
+          last_seen
         )
-      )`
-    )
+      )
+    `)
     .eq("id", conversationId)
     .is("deleted_at", null)
-    .single();
+    .maybeSingle();
 
   if (error) return sendResponse(res, 500, "Internal Server error", null);
   if (!data) return sendResponse(res, 404, "Conversation not found", null);
+
   return sendResponse(res, 200, "Conversation fetched", data);
 });
 
 
 
 export const createOrGetDM = asyncHandler(async (req, res) => {
-  const id = req.user.id;
+  console.log("createOrGetDM hit");
+  const userId = req.user.id;
   const { user_id: targetId } = req.body;
 
-  if (!targetId) return sendResponse(res, 400, "user_id is required");
-  if (targetId === id)
-    return sendResponse(res, 400, "You cannot DM yourself");
+  console.log(userId,targetId);
 
-  // Check target user exists
+  if (!targetId) return sendResponse(res, 400, "user_id is required");
+  if (targetId === userId) return sendResponse(res, 400, "Invalid request");
+
+
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id")
     .eq("id", targetId)
-    .single();
+    .maybeSingle();
 
-  if (profileError || !profile)
-    return sendResponse(res, 404, "User not found", null);
+  if (profileError) {
+    console.log(profileError);
+    return sendResponse(res, 500, "Internal Server error", null);
+  }
 
-  // Check block (either direction)
-  const { data: block } = await supabase
+  if (!profile) return sendResponse(res, 404, "User not found", null);
+
+  const { data: block, error: blockError } = await supabase
     .from("blocked_users")
     .select("id")
     .or(
-      `and(blocker_id.eq.${id},blocked_id.eq.${targetId}),and(blocker_id.eq.${targetId},blocked_id.eq.${id})`
+      `and(blocker_id.eq.${userId},blocked_id.eq.${targetId}),and(blocker_id.eq.${targetId},blocked_id.eq.${userId})`
     )
     .maybeSingle();
 
-  if (block) return sendResponse(res, 403, "Cannot start conversation with this user");
-
-  // Find existing DM between both users
-  const { data: myDMs } = await supabase
-    .from("conversation_members")
-    .select("conversation_id")
-    .eq("user_id", id);
-
-  const { data: theirDMs } = await supabase
-    .from("conversation_members")
-    .select("conversation_id")
-    .eq("user_id", targetId);
-
-  const myIds = myDMs?.map((r) => r.conversation_id) || [];
-  const theirIds = theirDMs?.map((r) => r.conversation_id) || [];
-  const sharedIds = myIds.filter((cid) => theirIds.includes(cid));
-
-  if (sharedIds.length > 0) {
-    // Return existing DM
-    const { data: existing, error: existingError } = await supabase
-      .from("conversations")
-      .select(
-        `id, is_group, last_message_at, created_at,
-        last_message:last_message_id (
-          id, content, message_type, sender_id, created_at
-        ),
-        members:conversation_members (
-          id, role,
-          profile:user_id (
-            id, username, display_name, avatar_url, is_online
-          )
-        )`
-      )
-      .eq("id", sharedIds[0])
-      .eq("is_group", false)
-      .single();
-
-    if (existingError)
-      return sendResponse(res, 500, "Internal Server error", null);
-    return sendResponse(res, 200, "DM already exists", existing);
+  if (blockError) {
+    console.log(blockError);
+    return sendResponse(res, 500, "Internal Server error", null);
   }
 
-  // Create new DM conversation
+  if (block) {
+    return sendResponse(res, 403, "Blocked user");
+  }
+
+  const { data: myConvs } = await supabase
+    .from("conversation_members")
+    .select(`
+      conversation_id,
+      conversation:conversation_id (
+        id,
+        is_group,
+        deleted_at
+      )
+    `)
+    .eq("user_id", userId)
+    .is("left_at", null)
+    .is("removed_at", null);
+
+  const { data: theirConvs } = await supabase
+    .from("conversation_members")
+    .select("conversation_id")
+    .eq("user_id", targetId)
+    .is("left_at", null)
+    .is("removed_at", null);
+
+  const myIds = (myConvs || [])
+    .filter((c) => c.conversation && c.conversation.is_group === false && !c.conversation.deleted_at)
+    .map((c) => c.conversation_id);
+
+  const theirIds = (theirConvs || []).map((c) => c.conversation_id);
+
+  const shared = myIds.filter((id) => theirIds.includes(id));
+
+  if (shared.length) {
+    const { data: existing } = await supabase
+      .from("conversations")
+      .select(`
+        id,
+        is_group,
+        last_message_at,
+        created_at,
+        members:conversation_members (
+          id,
+          role,
+          profile:user_id (
+            id,
+            username,
+            display_name,
+            avatar_url,
+            is_online,
+            last_seen
+          )
+        )
+      `)
+      .eq("id", shared[0])
+      .eq("is_group", false)
+      .maybeSingle();
+
+    return sendResponse(res, 200, "DM exists", existing);
+  }
+
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
-    .insert({ is_group: false, created_by: id })
+    .insert({ is_group: false, created_by: userId })
     .select("id")
     .single();
 
-  if (convError) return sendResponse(res, 500, "Internal Server error", null);
+  if (convError) {
+    console.log(convError);
+    return sendResponse(res, 500, "Internal Server error", null);
+  }
 
-  // Add both members
   const { error: membersError } = await supabase
     .from("conversation_members")
     .insert([
-      { conversation_id: conversation.id, user_id: id, role: "member" },
-      { conversation_id: conversation.id, user_id: targetId, role: "member" },
+      { conversation_id: conversation.id, user_id: userId, role: "member" },
+      { conversation_id: conversation.id, user_id: targetId, role: "member" }
     ]);
 
-  if (membersError)
+  if (membersError) {
+    console.log(membersError);
     return sendResponse(res, 500, "Internal Server error", null);
+  }
 
-  const { data: newDM, error: newDMError } = await supabase
+  const { data: newDM } = await supabase
     .from("conversations")
-    .select(
-      `id, is_group, last_message_at, created_at,
+    .select(`
+      id,
+      is_group,
+      created_at,
       members:conversation_members (
-        id, role,
+        id,
+        role,
         profile:user_id (
-          id, username, display_name, avatar_url, is_online
+          id,
+          username,
+          display_name,
+          avatar_url,
+          is_online,
+          last_seen
         )
-      )`
-    )
+      )
+    `)
     .eq("id", conversation.id)
-    .single();
+    .maybeSingle();
 
-  if (newDMError) return sendResponse(res, 500, "Internal Server error", null);
   return sendResponse(res, 201, "DM created", newDM);
 });
 
 
+
 export const createGroup = asyncHandler(async (req, res) => {
-  const id = req.user.id;
+  console.log("createGroup hit");
+
+  const userId = req.user.id;
   const { group_name, group_avatar, group_description, member_ids } = req.body;
 
-  if (!group_name) return sendResponse(res, 400, "group_name is required");
-  if (!member_ids || !Array.isArray(member_ids) || member_ids.length === 0)
-    return sendResponse(res, 400, "member_ids array is required");
-  if (member_ids.includes(id))
-    return sendResponse(res, 400, "Do not include yourself in member_ids");
+  if (!group_name) return sendResponse(res, 400, "group_name required");
+  if (!Array.isArray(member_ids) || !member_ids.length)
+    return sendResponse(res, 400, "member_ids required");
 
-  // Create group conversation
-  const { data: conversation, error: convError } = await supabase
+  const uniqueMembers = [...new Set(member_ids.filter((id) => id !== userId))];
+
+  const { data: conversation, error } = await supabase
     .from("conversations")
     .insert({
       is_group: true,
       group_name,
-      group_avatar: group_avatar || null,
-      group_description: group_description || null,
-      created_by: id,
+      group_avatar,
+      group_description,
+      created_by: userId
     })
     .select("id")
     .single();
 
-  if (convError) return sendResponse(res, 500, "Internal Server error", null);
+  if (error) {
+    console.log(error);
+    return sendResponse(res, 500, "Internal Server error", null);
+  }
 
-  // Creator is owner, rest are members
-  const membersToInsert = [
-    { conversation_id: conversation.id, user_id: id, role: "owner" },
-    ...member_ids.map((uid) => ({
+  const members = [
+    { conversation_id: conversation.id, user_id: userId, role: "admin" },
+    ...uniqueMembers.map((id) => ({
       conversation_id: conversation.id,
-      user_id: uid,
-      role: "member",
-    })),
+      user_id: id,
+      role: "member"
+    }))
   ];
 
-  const { error: membersError } = await supabase
+  const { error: memberError } = await supabase
     .from("conversation_members")
-    .insert(membersToInsert);
+    .insert(members);
 
-  if (membersError)
+  if (memberError) {
+    console.log(memberError);
     return sendResponse(res, 500, "Internal Server error", null);
+  }
 
-  const { data: group, error: groupError } = await supabase
+  const { data: group } = await supabase
     .from("conversations")
-    .select(
-      `id, is_group, group_name, group_avatar, group_description,
-      created_by, created_at,
+    .select(`
+      id,
+      is_group,
+      group_name,
+      group_avatar,
+      group_description,
+      created_by,
+      created_at,
       members:conversation_members (
-        id, role,
+        id,
+        role,
         profile:user_id (
-          id, username, display_name, avatar_url
+          id,
+          username,
+          display_name,
+          avatar_url,
+          is_online
         )
-      )`
-    )
+      )
+    `)
     .eq("id", conversation.id)
-    .single();
+    .maybeSingle();
 
-  if (groupError) return sendResponse(res, 500, "Internal Server error", null);
   return sendResponse(res, 201, "Group created", group);
 });
 
-
-
 export const updateGroupInfo = asyncHandler(async (req, res) => {
-  const id = req.user.id;
-  const { id: conversationId } = req.params;
+  console.log("updatedGroupInfo hit");
+  const userId = req.user.id;
+  const { id } = req.params;
   const { group_name, group_avatar, group_description } = req.body;
 
-  if (!group_name && !group_avatar && !group_description)
-    return sendResponse(res, 400, "No fields provided to update");
-
-  // Check admin/owner role
-  const { data: membership, error: memberError } = await supabase
+  const { data: member } = await supabase
     .from("conversation_members")
     .select("role")
-    .eq("conversation_id", conversationId)
-    .eq("user_id", id)
-    .single();
+    .eq("conversation_id", id)
+    .eq("user_id", userId)
+    .is("left_at", null)
+    .is("removed_at", null)
+    .maybeSingle();
 
-  if (memberError || !membership)
-    return sendResponse(res, 403, "You are not a member of this group");
-  if (!["admin", "owner"].includes(membership.role))
-    return sendResponse(res, 403, "Only admins and owners can update group info");
+  if (!member) return sendResponse(res, 403, "Not allowed");
+  if (!["admin", "owner"].includes(member.role))
+    return sendResponse(res, 403, "Only admin/owner can update");
 
-  const updates = {};
+  const updates = { updated_at: new Date().toISOString() };
   if (group_name !== undefined) updates.group_name = group_name;
   if (group_avatar !== undefined) updates.group_avatar = group_avatar;
   if (group_description !== undefined) updates.group_description = group_description;
-  updates.updated_at = new Date().toISOString();
+
+  if (Object.keys(updates).length === 1) {
+    return sendResponse(res, 400, "No fields to update");
+  }
 
   const { data, error } = await supabase
     .from("conversations")
     .update(updates)
-    .eq("id", conversationId)
+    .eq("id", id)
     .eq("is_group", true)
+    .is("deleted_at", null)
     .select("id, group_name, group_avatar, group_description, updated_at")
-    .single();
+    .maybeSingle();
 
-  if (error) return sendResponse(res, 500, "Internal Server error", null);
-  if (!data) return sendResponse(res, 404, "Group not found", null);
-  return sendResponse(res, 200, "Group info updated", data);
+  if (error) {
+    console.log(error);
+    return sendResponse(res, 500, "Internal Server error", null);
+  }
+
+  return sendResponse(res, 200, "Updated", data);
 });

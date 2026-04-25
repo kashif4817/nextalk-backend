@@ -11,7 +11,7 @@ const router = express.Router();
 
 router.get('/contacts', authMiddleware, getContacts);
 router.post('/contacts', authMiddleware, addContact);
-router.patch('/contacts/:id', authMiddleware, updateContact);
-router.delete('/contacts/:id', authMiddleware, removeContact);
+router.patch('/contacts/:contact_id', authMiddleware, updateContact);
+router.delete('/contacts/:contact_id', authMiddleware, removeContact);
 
 export default router;
