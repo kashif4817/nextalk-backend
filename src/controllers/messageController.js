@@ -1,6 +1,7 @@
 import asyncHandler from "../utils/asyncHandler.js";
 import { sendResponse } from "../utils/sendResponse.js";
 import supabase from "../config/supabase.js";
+import { createMessage } from "../services/message.service.js";
 
 const DEFAULT_LIMIT = 30;
 const EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -68,81 +69,22 @@ export const getMessages = asyncHandler(async (req, res) => {
 
 
 export const sendMessage = asyncHandler(async (req, res) => {
-  const id = req.user.id;
-  const {
+  const sender_id = req.user.id
+  const { conversation_id, content, message_type = "text", file_url, file_type, reply_to_id } = req.body
+
+  const message = await createMessage({
     conversation_id,
+    sender_id,
     content,
-    message_type = "text",
+    message_type,
     file_url,
     file_type,
-    reply_to_id,
-  } = req.body;
+    reply_to_id
+  })
 
-  if (!conversation_id)
-    return sendResponse(res, 400, "conversation_id is required");
-  if (!content && !file_url)
-    return sendResponse(res, 400, "content or file_url is required");
-
-  const VALID_TYPES = [
-    "text", "image", "video", "audio", "document",
-    "sticker", "gif", "location", "contact",
-  ];
-  if (!VALID_TYPES.includes(message_type))
-    return sendResponse(res, 400, "Invalid message_type");
-
-  // Verify membership
-  const { data: membership, error: memberError } = await supabase
-    .from("conversation_members")
-    .select("id")
-    .eq("conversation_id", conversation_id)
-    .eq("user_id", id)
-    .is("left_at", null)
-    .is("removed_at", null)
-    .single();
-
-  if (memberError || !membership)
-    return sendResponse(res, 403, "You are not a member of this conversation");
-
-  const { data: message, error: msgError } = await supabase
-    .from("messages")
-    .insert({
-      conversation_id,
-      sender_id: id,
-      content: content || null,
-      message_type,
-      file_url: file_url || null,
-      file_type: file_type || null,
-      reply_to_id: reply_to_id || null,
-    })
-    .select(
-      `id, conversation_id, sender_id, message_type, content,
-      file_url, file_type, edited_at, is_pinned, created_at,
-      reply_to:reply_to_id (
-        id, content, message_type, sender_id
-      ),
-      sender:sender_id (
-        id, username, display_name, avatar_url
-      )`
-    )
-    .single();
-
-  if (msgError) return sendResponse(res, 500, "Internal Server error", null);
-
-  // Update conversation's last message pointer
-  const { error: convError } = await supabase
-    .from("conversations")
-    .update({
-      last_message_id: message.id,
-      last_message_at: message.created_at,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", conversation_id);
-
-  if (convError) return sendResponse(res, 500, "Internal Server error", null);
-
-  return sendResponse(res, 201, "Message sent", message);
-});
-
+  if (!message) return sendResponse(res, 400, "Failed to send message")
+  return sendResponse(res, 201, "Message sent", message)
+})
 
 export const editMessage = asyncHandler(async (req, res) => {
   const id = req.user.id;
