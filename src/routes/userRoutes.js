@@ -4,7 +4,7 @@ import { forgotPassword, login, logout, refreshToken, signup } from '../controll
 import { getMe, getUserProfile, searchUsers, setUsername, updateProfile } from '../controllers/profileController.js';
 import { addContact, getContacts, removeContact, updateContact } from '../controllers/contactController.js';
 import { blockUser, getBlockedUsers, unblockUser } from '../controllers/blockController.js';
-import { createConversation, getSingleConversation } from '../controllers/conversationController.js';
+import { createGroup, createOrGetDM, getAllConversations, getConversation, updateGroupInfo } from '../controllers/conversationController.js';
 
 const router = express.Router();
 
@@ -36,14 +36,13 @@ router.get('/blocks', authMiddleware, getBlockedUsers);
 router.post('/blocks', authMiddleware, blockUser);
 router.delete('/blocks/:id', authMiddleware, unblockUser);
 
-//userController
-// router.get('/users/search',authMiddleware,searchUsers)
-// router.get('/users/:id',authMiddleware,getUserProfile)
 
-
-
-router.post('/conversation/create',authMiddleware,createConversation)
-router.get('/conversations/:id',authMiddleware,getSingleConversation)
+// conversationController
+router.get('/conversations', authMiddleware, getAllConversations);
+router.get('/conversations/:id', authMiddleware, getConversation);
+router.post('/conversations/dm', authMiddleware, createOrGetDM);
+router.post('/conversations/group', authMiddleware, createGroup);
+router.put('/conversations/:id/group-info', authMiddleware, updateGroupInfo);
 
 export default router
 
