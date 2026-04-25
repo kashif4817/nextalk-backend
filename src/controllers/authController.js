@@ -34,6 +34,7 @@ export const signup = asyncHandler(async (req, res) => {
     options: { data: { display_name: name } },
   });
 
+  console.log(error);
   if (error) return sendResponse(res, 400, error.message, null);
   console.log("data :>> ", data);
   return sendResponse(res, 201, "Signup successful");
