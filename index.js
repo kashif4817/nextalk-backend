@@ -5,7 +5,12 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { validateEnv } from "./src/config/env.js";
-import router from "./src/routes/userRoutes.js";
+import authRoutes from "./src/routes/authRoutes.js";
+import userRoutes from "./src/routes/userRoutes.js";
+import contactRoutes from "./src/routes/contactRoutes.js";
+import blockRoutes from "./src/routes/blockRoutes.js";
+import conversationRoutes from "./src/routes/conversationRoutes.js";
+import messageRoutes from "./src/routes/messageRoutes.js";
 
 dotenv.config();
 validateEnv(); 
@@ -21,8 +26,13 @@ app.use(
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(cookieParser());
-app.use('/api',router)
 
+app.use('/api', authRoutes);
+app.use('/api', userRoutes);
+app.use('/api', contactRoutes);
+app.use('/api', blockRoutes);
+app.use('/api', conversationRoutes);
+app.use('/api', messageRoutes);
 
 
 app.get("/", (req, res) => {
