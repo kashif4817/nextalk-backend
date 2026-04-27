@@ -1,4 +1,4 @@
-import supabase from "../config/supabase";
+import supabase from "../config/supabase.js";
 
 export const socketAuth = async (socket, next) => {
   const token = socket.handshake.auth.token;

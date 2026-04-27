@@ -1,8 +1,8 @@
 import http from "http";
 import { Server } from "socket.io";
 
-import socketAuthMiddleware from "./src/sockets/middleware/socketAuthMiddleware.js";
-import socketHandler from "./src/sockets/socketHandler.js";
+import { socketAuth } from "./src/socket/socketAuth.js";
+import { socketHandler } from "./src/socket/socketHandler.js";
 
 import morgan from "morgan";
 import express from "express";
@@ -28,13 +28,14 @@ const io = new Server(httpServer, {
   cors: { origin:FRONTEND_URL, credentials: true },
 });
 
-io.use(socketAuthMiddleware);
+io.use(socketAuth);
 io.on("connection", socketHandler(io));
 
 app.use(helmet());
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    // origin: "*",
     credentials: true,
   }),
 );

@@ -1,7 +1,7 @@
 // utils/privacy.js
 
 // - Privacy filter (canSee) — implement before v1.0 deploy (Phase 11)
-import supabase from "../config/supabase";
+import supabase from "../config/supabase.js";
 
 const isBlocked = async (targetId, viewerId) => {
   if (!targetId || !viewerId) return sendResponse(res, "No id proviede");

@@ -5,7 +5,7 @@ export function validateEnv() {
     const requiredEnv = [
         "SUPABASE_URL",
         "SUPABASE_ANON_KEY",
-        "CLIENT_URL",
+        "FRONTEND_URL",
         "PORT"
     ];
 

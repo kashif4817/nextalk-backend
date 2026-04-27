@@ -1,4 +1,4 @@
-import { createMessage } from "../../services/message.service";
+import { createMessage } from "../../services/message.service.js";
 
 export const messageEvents = (io, socket) => {
   socket.on("message:send", async (data) => {

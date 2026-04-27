@@ -1,5 +1,5 @@
 // services/message.service.js
-import supabase from "../config/supabase";
+import supabase from "../config/supabase.js";
 export const createMessage = async ({
   conversation_id,
   sender_id,
