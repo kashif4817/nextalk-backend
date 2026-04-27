@@ -1,3 +1,9 @@
+import http from "http";
+import { Server } from "socket.io";
+
+import { socketAuth } from "./src/socket/socketAuth.js";
+import { socketHandler } from "./src/socket/socketHandler.js";
+
 import morgan from "morgan";
 import express from "express";
 import dotenv from "dotenv";
@@ -13,13 +19,23 @@ import conversationRoutes from "./src/routes/conversationRoutes.js";
 import messageRoutes from "./src/routes/messageRoutes.js";
 
 dotenv.config();
-validateEnv(); 
+validateEnv();
 const app = express();
+const FRONTEND_URL = process.env.FRONTEND_URL
+
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin:FRONTEND_URL, credentials: true },
+});
+
+io.use(socketAuth);
+io.on("connection", socketHandler(io));
 
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    // origin: "*",
     credentials: true,
   }),
 );
@@ -27,52 +43,18 @@ app.use(morgan("dev"));
 app.use(express.json());
 app.use(cookieParser());
 
-app.use('/api', authRoutes);
-app.use('/api', userRoutes);
-app.use('/api', contactRoutes);
-app.use('/api', blockRoutes);
-app.use('/api', conversationRoutes);
-app.use('/api', messageRoutes);
-
+app.use("/api", authRoutes);
+app.use("/api", userRoutes);
+app.use("/api", contactRoutes);
+app.use("/api", blockRoutes);
+app.use("/api", conversationRoutes);
+app.use("/api", messageRoutes);
 
 app.get("/", (req, res) => {
   res.send("Hello world!");
 });
 
-app.get("/auth/callback", async function (req, res) {
-  const code = req.query.code;
-  const next = req.query.next ?? "/";
-
-  if (code) {
-    const supabase = createServerClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_PUBLISHABLE_KEY,
-      {
-        cookies: {
-          getAll() {
-            return parseCookieHeader(req.headers.cookie ?? "");
-          },
-          setAll(cookiesToSet, headers) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              res.appendHeader(
-                "Set-Cookie",
-                serializeCookieHeader(name, value, options),
-              ),
-            );
-            Object.entries(headers).forEach(([key, value]) =>
-              res.setHeader(key, value),
-            );
-          },
-        },
-      },
-    );
-    await supabase.auth.exchangeCodeForSession(code);
-  }
-
-  res.redirect(303, `/${next.slice(1)}`);
-});
-
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+httpServer.listen(PORT)
 
 export default app;
