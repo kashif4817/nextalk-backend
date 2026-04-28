@@ -81,6 +81,30 @@ export const searchUsers = asyncHandler(async (req, res) => {
 });
 
 
+export const getAllUsers = asyncHandler(async (req, res) => {
+  const id = req.user.id;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, about, avatar_url, is_online")
+    .order("created_at", { ascending: false });
+
+  if (error) return sendResponse(res, 500, "Internal Server error", null);
+
+  const { data: blocks, error: blocksError } = await supabase
+    .from("blocked_users")
+    .select("blocker_id, blocked_id")
+    .or(`blocker_id.eq.${id},blocked_id.eq.${id}`);
+
+  if (blocksError) return sendResponse(res, 500, "Internal Server error", null);
+
+  const excludeIds = new Set(blocks.flatMap((b) => [b.blocker_id, b.blocked_id]));
+  const filtered = data.filter((user) => !excludeIds.has(user.id) && user.id !== id);
+
+  return sendResponse(res, 200, "Users fetched", filtered);
+});
+
+
 export const updateProfile = asyncHandler(async (req, res) => {
   const id = req.user.id;
   const { display_name, about, avatar_url } = req.body;
