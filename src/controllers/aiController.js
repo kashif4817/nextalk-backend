@@ -12,18 +12,33 @@ export const chatWithAI = asyncHandler(async (req, res) => {
     return sendResponse(res, 400, "message is required");
   }
 
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+
+  const writeEvent = (event, data) => {
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
   try {
-    const response = await ai.models.generateContent({
+    const stream = await ai.models.generateContentStream({
       model: "gemini-2.5-flash",
       contents: message,
     });
 
-    const reply = response.text;
-    if (!reply) return sendResponse(res, 502, "Empty response from AI");
+    for await (const chunk of stream) {
+      const text = chunk.text;
+      if (text) writeEvent("chunk", { text });
+    }
 
-    return sendResponse(res, 200, "AI replied", { reply });
+    writeEvent("done", { ok: true });
+    res.end();
   } catch (err) {
     console.log(err);
-    return sendResponse(res, 500, "AI request failed");
+    writeEvent("error", { message: "AI request failed" });
+    res.end();
   }
 });
