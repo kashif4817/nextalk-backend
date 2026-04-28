@@ -5,6 +5,8 @@ import {
   getUserProfile,
   searchUsers,
   setUsername,
+  updatePresence,
+  updatePrivacy,
   updateProfile,
 } from '../controllers/profileController.js';
 
@@ -15,5 +17,7 @@ router.get('/users/search', authMiddleware, searchUsers);
 router.get('/users/:id', getUserProfile);
 router.put('/users/me', authMiddleware, updateProfile);
 router.put('/users/me/username', authMiddleware, setUsername);
+router.put('/users/me/privacy', authMiddleware, updatePrivacy);
+router.put('/users/me/presence', authMiddleware, updatePresence);
 
 export default router;

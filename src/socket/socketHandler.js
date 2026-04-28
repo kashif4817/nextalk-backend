@@ -14,8 +14,8 @@ export const socketHandler = (io) => async (socket) => {
     .eq("user_id", userId)
     .is("left_at", null)
     .is("removed_at", null);
-  conversations.forEach((c) => {
-    socket.join(`conv:${c.conversation_id}`); // ←
+  (conversations || []).forEach((c) => {
+    socket.join(`conv:${c.conversation_id}`);
   });
 
   // after joining rooms, mark user online

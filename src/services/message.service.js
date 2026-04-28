@@ -32,7 +32,7 @@ export const createMessage = async ({
     .eq("user_id", sender_id)
     .is("left_at", null)
     .is("removed_at", null)
-    .single();
+    .maybeSingle();
 
   if (memberError || !membership) return false;
   const { data: message, error: msgError } = await supabase

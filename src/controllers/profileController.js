@@ -107,6 +107,71 @@ export const updateProfile = asyncHandler(async (req, res) => {
 });
 
 
+export const updatePrivacy = asyncHandler(async (req, res) => {
+  const id = req.user.id;
+  const { last_seen_privacy, profile_photo_privacy, about_privacy, read_receipts_privacy } = req.body;
+
+  const VALID = ["everyone", "contacts", "nobody"];
+
+  const updates = {};
+  if (last_seen_privacy !== undefined) {
+    if (!VALID.includes(last_seen_privacy)) return sendResponse(res, 400, "last_seen_privacy must be 'everyone', 'contacts', or 'nobody'");
+    updates.last_seen_privacy = last_seen_privacy;
+  }
+  if (profile_photo_privacy !== undefined) {
+    if (!VALID.includes(profile_photo_privacy)) return sendResponse(res, 400, "profile_photo_privacy must be 'everyone', 'contacts', or 'nobody'");
+    updates.profile_photo_privacy = profile_photo_privacy;
+  }
+  if (about_privacy !== undefined) {
+    if (!VALID.includes(about_privacy)) return sendResponse(res, 400, "about_privacy must be 'everyone', 'contacts', or 'nobody'");
+    updates.about_privacy = about_privacy;
+  }
+  if (read_receipts_privacy !== undefined) {
+    if (!VALID.includes(read_receipts_privacy)) return sendResponse(res, 400, "read_receipts_privacy must be 'everyone', 'contacts', or 'nobody'");
+    updates.read_receipts_privacy = read_receipts_privacy;
+  }
+
+  if (!Object.keys(updates).length)
+    return sendResponse(res, 400, "No privacy fields provided");
+
+  updates.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("id", id)
+    .select("id, last_seen_privacy, profile_photo_privacy, about_privacy, read_receipts_privacy, updated_at")
+    .single();
+
+  if (error) return sendResponse(res, 500, "Internal Server error", null);
+  return sendResponse(res, 200, "Privacy settings updated", data);
+});
+
+
+export const updatePresence = asyncHandler(async (req, res) => {
+  const id = req.user.id;
+  const { is_online } = req.body;
+
+  if (is_online === undefined) return sendResponse(res, 400, "is_online is required");
+
+  const updates = {
+    is_online,
+    last_seen: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("id", id)
+    .select("id, is_online, last_seen")
+    .single();
+
+  if (error) return sendResponse(res, 500, "Internal Server error", null);
+  return sendResponse(res, 200, "Presence updated", data);
+});
+
+
 export const setUsername = asyncHandler(async (req, res) => {
   const id = req.user.id;
   const { username } = req.body;

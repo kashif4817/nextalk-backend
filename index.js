@@ -17,6 +17,8 @@ import contactRoutes from "./src/routes/contactRoutes.js";
 import blockRoutes from "./src/routes/blockRoutes.js";
 import conversationRoutes from "./src/routes/conversationRoutes.js";
 import messageRoutes from "./src/routes/messageRoutes.js";
+import uploadRoutes from "./src/routes/uploadRoutes.js";
+import notificationRoutes from "./src/routes/notificationRoutes.js";
 
 dotenv.config();
 validateEnv();
@@ -49,6 +51,8 @@ app.use("/api", contactRoutes);
 app.use("/api", blockRoutes);
 app.use("/api", conversationRoutes);
 app.use("/api", messageRoutes);
+app.use("/api", uploadRoutes);
+app.use("/api", notificationRoutes);
 
 app.get("/", (req, res) => {
   res.send("Hello world!");

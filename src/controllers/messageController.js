@@ -31,7 +31,7 @@ export const getMessages = asyncHandler(async (req, res) => {
     .from("messages")
     .select(
       `id, conversation_id, sender_id, message_type, content, file_url,
-      file_type, edited_at, is_pinned, created_at,
+      file_type, edited_at, is_pinned, created_at, deleted_for_me_at,
       reply_to:reply_to_id (
         id, content, message_type, sender_id
       ),

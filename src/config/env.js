@@ -6,7 +6,10 @@ export function validateEnv() {
         "SUPABASE_URL",
         "SUPABASE_ANON_KEY",
         "FRONTEND_URL",
-        "PORT"
+        "PORT",
+        "CLOUDINARY_CLOUD_NAME",
+        "CLOUDINARY_API_KEY",
+        "CLOUDINARY_API_SECRET",
     ];
 
     requiredEnv.forEach((key) => {
