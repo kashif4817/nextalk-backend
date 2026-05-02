@@ -50,7 +50,8 @@ export const createMessage = async ({
       `id, conversation_id, sender_id, message_type, content,
       file_url, file_type, edited_at, is_pinned, created_at,
       reply_to:reply_to_id (
-        id, content, message_type, sender_id
+        id, content, message_type, file_url, sender_id,
+        sender:sender_id ( id, display_name )
       ),
       sender:sender_id (
         id, username, display_name, avatar_url

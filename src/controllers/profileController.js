@@ -98,8 +98,33 @@ export const getAllUsers = asyncHandler(async (req, res) => {
 
   if (blocksError) return sendResponse(res, 500, "Internal Server error", null);
 
+  // Find all conversations the current user is part of
+  const { data: myConvs, error: convError } = await supabase
+    .from("conversation_members")
+    .select("conversation_id")
+    .eq("user_id", id);
+
+  if (convError) return sendResponse(res, 500, "Internal Server error", null);
+
+  const convIds = myConvs.map((r) => r.conversation_id);
+
+  // Get all other members in those conversations
+  let conversationUserIds = new Set();
+  if (convIds.length > 0) {
+    const { data: members, error: membersError } = await supabase
+      .from("conversation_members")
+      .select("user_id")
+      .in("conversation_id", convIds)
+      .neq("user_id", id);
+
+    if (membersError) return sendResponse(res, 500, "Internal Server error", null);
+    members.forEach((m) => conversationUserIds.add(m.user_id));
+  }
+
   const excludeIds = new Set(blocks.flatMap((b) => [b.blocker_id, b.blocked_id]));
-  const filtered = data.filter((user) => !excludeIds.has(user.id) && user.id !== id);
+  const filtered = data.filter(
+    (user) => !excludeIds.has(user.id) && !conversationUserIds.has(user.id) && user.id !== id
+  );
 
   return sendResponse(res, 200, "Users fetched", filtered);
 });
